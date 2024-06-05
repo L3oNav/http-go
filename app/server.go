@@ -91,7 +91,7 @@ func Handler(conn net.Conn) {
         fmt.Println("Error writing file: ", err.Error())
         response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
       } else {
-        response = getStatus(201, "OK") + "\r\n\r\n"
+        response = getStatus(201, "Created") + "\r\n\r\n"
       }
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
