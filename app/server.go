@@ -69,7 +69,7 @@ func Handler(conn net.Conn) {
 		  response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent)
 	  case path == "/":
 		  response = getStatus(200, "OK") + "\r\n\r\n"
-    case strings.HasPrefix(path, "/files/"):
+    case strings.HasPrefix(path, "/files/") && req.Method == "GET":
       dir := os.Args[2]
       fileName := strings.TrimPrefix(path, "/files/")
       fmt.Println("dir: ", dir, " fileName: ", fileName)
@@ -81,7 +81,17 @@ func Handler(conn net.Conn) {
       } else {
         response = fmt.Sprintf("%s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
       }
-
+    case strings.HasPrefix(path, "/files/") && req.Method == "POST":
+      dir := os.Args[2]
+      content := strings.Trim(request[len(request)-1], "\x00")
+      _, err = os.WriteFile(path.Join(dir, path[7:]), []byte(content), 0644)
+      if err != nil {
+        fmt.Println("Error writing file: ", err.Error())
+        response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
+      } else {
+        response = getStatus(200, "OK") + "\r\n\r\n"
+      }
+  
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
 	}
