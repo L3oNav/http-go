@@ -6,6 +6,7 @@ import (
   "net"
 	"os"
   "strings"
+  "bytes"
 )
 
 type HTTPRequest struct {
