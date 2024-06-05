@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	// Uncomment this block to pass the first stage
 	"net"
 	"os"
 )
@@ -17,14 +16,19 @@ func main() {
 	// Uncomment this block to pass the first stage
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
+  if err != nil {
+    fmt.Println("Failed to bind to port 4221")
+    os.Exit(1)
+  }
 
   // send 200 OK
-  client, err = l.Accept()
+  conn, err := l.Accept()
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
+  
 		os.Exit(1)
 	}
-  client.Write(OK_HTTP_1)
+  conn.Write(OK_HTTP_1)
   defer l.Close() 
 
 	if err != nil {
