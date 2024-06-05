@@ -71,15 +71,17 @@ func Handler(conn net.Conn) {
 		  response = getStatus(200, "OK") + "\r\n\r\n"
     case strings.HasPrefix(path, "/files/"):
       dir := os.Args[2]
-      fileName := strings.Split(req.Body, "/") 
-      fmt.Println("File name: ", fileName)
-      data, error := os.ReadFile(dir + fileName)
+      fileName := strings.TrimPrefix(path, "/files/")
+      fmt.Println("dir: ", dir, " fileName: ", fileName)
+      data, error := os.ReadFile(dir + "/" + fileName)
+
       if error != nil {
-        fmt.Println("Error reading file: ", error.Error())
+        fmt.Println("Error reading file: ", error.Error(), " for file: ", fileName, " in directory: ", dir)
         response = getStatus(404, "Not Found") + "\r\n\r\n"
       } else {
-        response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
+        response = fmt.Sprintf("%s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
       }
+
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
 	}
