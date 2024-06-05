@@ -74,8 +74,8 @@ func Handler(conn net.Conn) {
       fileName := strings.Split(req.Body, "/")[2] 
       data, error := os.ReadFile(dir + fileName)
       if error != nil {
-        response = getStatus(404, "Not Found") + "\r\n\r\n"
         fmt.Println("Error reading file: ", error.Error())
+        response = getStatus(404, "Not Found") + "\r\n\r\n"
       } else {
         response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
       }
