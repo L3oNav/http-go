@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
   "net"
-  "bufio"
-	"net/http"
 	"os"
+  "strings"
 )
 // global variable to store HTTP/1.1 200 OK\r\n\r\n
 var OK_HTTP_1 = []byte("HTTP/1.1 200 OK\r\n\r\n")
@@ -13,14 +12,24 @@ var OK_HTTP_1 = []byte("HTTP/1.1 200 OK\r\n\r\n")
 func Handler(conn net.Conn) {
   defer conn.Close()
   // read the request
-  request, err := http.ReadRequest(bufio.NewReader(conn))
+
+  buff := make([]byte, 1024)
+
+  request, err := conn.Read(buff)
+  path := strings.Split(string(buff[:request]), " ")[1]
+
   if err != nil {
     fmt.Println("Error reading request: ", err.Error())
     return
   }
-  if request.URL.Path == "/" {
+
+  if path == "/" {
     conn.Write(OK_HTTP_1)
     return
+  } else if strings.Split(path, "/")[1] == "echo" {
+    message := strings.Split(path, "/")[2]
+    conn.Write([]byte(fmt.Sprintf(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(message), message)     ))
   }
   conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 }
