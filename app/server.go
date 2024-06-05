@@ -83,15 +83,15 @@ func Handler(conn net.Conn) {
       }
     case strings.HasPrefix(path, "/files/") && req.Method == "POST":
       dir := os.Args[2]
-      content := strings.Trim(req.Body[len(req.Body)-1], "\x00")
-      _, err = os.WriteFile(path.Join(dir, path[7:]), []byte(content), 0644)
+      fileName := strings.TrimPrefix(path, "/files/")
+      contents := bytes.Trim([]byte(req.Body), "\x00")
+      err := os.WriteFile(dir + fileName, contents, 0644)
       if err != nil {
         fmt.Println("Error writing file: ", err.Error())
         response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
       } else {
         response = getStatus(200, "OK") + "\r\n\r\n"
       }
-  
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
 	}
