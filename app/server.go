@@ -86,13 +86,12 @@ func Handler(conn net.Conn) {
       dir := os.Args[2]
       fileName := strings.TrimPrefix(path, "/files/")
       contents := bytes.Trim([]byte(req.Body), "\x00")
-      fmt.Sprintf("dir: %s, fileName: %s, contents: %s", dir, fileName, contents)
       err := os.WriteFile(dir + fileName, contents, 0644)
       if err != nil {
         fmt.Println("Error writing file: ", err.Error())
         response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
       } else {
-        response = getStatus(200, "OK") + "\r\n\r\n"
+        response = getStatus(201, "OK") + "\r\n\r\n"
       }
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
