@@ -85,7 +85,6 @@ func Handler(conn net.Conn) {
     case strings.HasPrefix(path, "/files/") && req.Method == "POST":
       dir := os.Args[2]
       fileName := strings.TrimPrefix(path, "/files/")
-      fmt.Println("body: ", req.Body)
       contents := bytes.Trim([]byte(req.Body), "\x00")
       err := os.WriteFile(dir + fileName, contents, 0644)
       if err != nil {
