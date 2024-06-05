@@ -77,6 +77,7 @@ func Handler(conn net.Conn) {
         response = getStatus(404, "Not Found") + "\r\n\r\n"
       } else {
         response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
+      }
 	  default:
 		  response = getStatus(404, "Not Found") + "\r\n\r\n"
 	}
