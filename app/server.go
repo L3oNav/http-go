@@ -70,9 +70,8 @@ func Handler(conn net.Conn) {
 	  case path == "/":
 		  response = getStatus(200, "OK") + "\r\n\r\n"
     case strings.HasPrefix(path, "/files/"):
-      fmt.Println("Request for file: ", req.Body)
       dir := os.Args[2]
-      fileName := strings.Split(req.Body, "/")[0] 
+      fileName := strings.Split(req.Body, "/") 
       data, error := os.ReadFile(dir + fileName)
       if error != nil {
         fmt.Println("Error reading file: ", error.Error())
