@@ -86,6 +86,7 @@ func Handler(conn net.Conn) {
       dir := os.Args[2]
       fileName := strings.TrimPrefix(path, "/files/")
       contents := bytes.Trim([]byte(req.Body), "\x00")
+      fml := fmt.Sprintf("dir: %s, fileName: %s, contents: %s", dir, fileName, contents)
       err := os.WriteFile(dir + fileName, contents, 0644)
       if err != nil {
         fmt.Println("Error writing file: ", err.Error())
