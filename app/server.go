@@ -1,39 +1,78 @@
 package main
 
 import (
+  "bufio"
 	"fmt"
   "net"
 	"os"
   "strings"
 )
+
+type HTTPRequest struct {
+	Method    string
+	Path      string
+	Headers   map[string]string
+	Body      string
+	UserAgent string
+}
+
 // global variable to store HTTP/1.1 200 OK\r\n\r\n
 var OK_HTTP_1 = []byte("HTTP/1.1 200 OK\r\n\r\n")
+
+func getStatus(statusCode int, statusText string) string {
+	return fmt.Sprintf("HTTP/1.1 %d %s", statusCode, statusText)
+}
+
+func parseStatus(scanner *bufio.Scanner) (*HTTPRequest, error) {
+	var req HTTPRequest = HTTPRequest{}
+	req.Headers = make(map[string]string)
+	for i := 0; scanner.Scan(); i++ {
+		if i == 0 {
+			parts := strings.Split(scanner.Text(), " ")
+			req.Method = parts[0]
+			req.Path = parts[1]
+			continue
+		}
+		headers := strings.Split(scanner.Text(), ": ")
+		if len(headers) < 2 {
+			req.Body = headers[0]
+			break
+		}
+		if headers[0] == "User-Agent" {
+			req.UserAgent = headers[1]
+		}
+		req.Headers[headers[0]] = headers[1]
+	}
+	return &req, nil
+}
 
 func Handler(conn net.Conn) {
   defer conn.Close()
   // read the request
 
-  buff := make([]byte, 1024)
+  scanner := bufio.NewScanner(conn)
 
-  request, err := conn.Read(buff)
-  path := strings.Split(string(buff[:request]), " ")[1]
+  req, err := parseStatus(scanner)
 
   if err != nil {
     fmt.Println("Error reading request: ", err.Error())
     return
   }
+ 
+  var response string
 
-  if path == "/" {
-    conn.Write(OK_HTTP_1)
-    return
-  } else if strings.Split(path, "/")[1] == "echo" {
-    message := strings.Split(path, "/")[2]
-    conn.Write([]byte(fmt.Sprintf(
-      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(message), message)     ))
-  } else if path == "/user" {
-    conn.Write([]byte(fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent))
-  }
-  conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+  switch path := req.Path; {
+	  case strings.HasPrefix(path, "/echo/"):
+		  content := strings.TrimLeft(path, "/echo/")
+		  response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(content), content)
+	  case path == "/user-agent":
+		  response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent)
+	  case path == "/":
+		  response = getStatus(200, "OK") + "\r\n\r\n"
+	  default:
+		  response = getStatus(404, "Not Found") + "\r\n\r\n"
+	}
+  conn.Write([]byte(response))
 }
 
 
