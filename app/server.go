@@ -30,6 +30,8 @@ func Handler(conn net.Conn) {
     message := strings.Split(path, "/")[2]
     conn.Write([]byte(fmt.Sprintf(
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(message), message)     ))
+  } else if path == "/user" {
+    conn.Write([]byte(fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent))
   }
   conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 }
