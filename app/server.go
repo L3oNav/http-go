@@ -1,12 +1,14 @@
 package main
 
 import (
-  "bufio"
+	"bufio"
+	"bytes"
 	"fmt"
-  "net"
+	"io"
+	"net"
 	"os"
-  "strings"
-  "bytes"
+	"strconv"
+	"strings"
 )
 
 type HTTPRequest struct {
@@ -24,104 +26,118 @@ func getStatus(statusCode int, statusText string) string {
 	return fmt.Sprintf("HTTP/1.1 %d %s", statusCode, statusText)
 }
 
-func parseStatus(scanner *bufio.Scanner) (*HTTPRequest, error) {
-	var req HTTPRequest = HTTPRequest{}
+func parseRequest(conn net.Conn) (*HTTPRequest, error) {
+	var req HTTPRequest
 	req.Headers = make(map[string]string)
-	for i := 0; scanner.Scan(); i++ {
-		if i == 0 {
-			parts := strings.Split(scanner.Text(), " ")
+
+	reader := bufio.NewReader(conn)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.Trim(line, "\r\n")
+		if line == "" {
+			break // Empty line indicates the end of headers
+		}
+		if req.Method == "" {
+			parts := strings.Split(line, " ")
 			req.Method = parts[0]
 			req.Path = parts[1]
-			continue
+		} else {
+			parts := strings.SplitN(line, ": ", 2)
+			if len(parts) == 2 {
+				req.Headers[parts[0]] = parts[1]
+				if parts[0] == "User-Agent" {
+					req.UserAgent = parts[1]
+				}
+			}
 		}
-		headers := strings.Split(scanner.Text(), ": ")
-		if len(headers) < 2 {
-			req.Body = headers[0]
-			break
-		}
-		if headers[0] == "User-Agent" {
-			req.UserAgent = headers[1]
-		}
-		req.Headers[headers[0]] = headers[1]
 	}
+
+	if contentLengthStr, ok := req.Headers["Content-Length"]; ok {
+		contentLength, err := strconv.Atoi(contentLengthStr)
+		if err != nil {
+			return nil, err
+		}
+		body := make([]byte, contentLength)
+		_, err = io.ReadFull(reader, body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body = string(body)
+	}
+
 	return &req, nil
 }
 
 func Handler(conn net.Conn) {
-  defer conn.Close()
-  // read the request
-
-  scanner := bufio.NewScanner(conn)
-
-  req, err := parseStatus(scanner)
-
-  if err != nil {
-    fmt.Println("Error reading request: ", err.Error())
-    return
-  }
- 
-  var response string
-
-  switch path := req.Path; {
-	  case strings.HasPrefix(path, "/echo/"):
-		  content := strings.TrimLeft(path, "/echo/")
-		  response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(content), content)
-	  case path == "/user-agent":
-		  response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent)
-	  case path == "/":
-		  response = getStatus(200, "OK") + "\r\n\r\n"
-    case strings.HasPrefix(path, "/files/") && req.Method == "GET":
-      dir := os.Args[2]
-      fileName := strings.TrimPrefix(path, "/files/")
-      fmt.Println("dir: ", dir, " fileName: ", fileName)
-      data, error := os.ReadFile(dir + "/" + fileName)
-
-      if error != nil {
-        fmt.Println("Error reading file: ", error.Error(), " for file: ", fileName, " in directory: ", dir)
-        response = getStatus(404, "Not Found") + "\r\n\r\n"
-      } else {
-        response = fmt.Sprintf("%s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
-      }
-    case strings.HasPrefix(path, "/files/") && req.Method == "POST":
-      dir := os.Args[2]
-      fileName := strings.TrimPrefix(path, "/files/")
-      contents := bytes.Trim([]byte(req.Body), "\x00")
-      _, err := os.WriteFile(dir + "/" + fileName, contents, 0644)
-      if err != nil {
-        fmt.Println("Error writing file: ", err.Error())
-        response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
-      } else {
-        response = getStatus(201, "Created") + "\r\n\r\n"
-      }
-	  default:
-		  response = getStatus(404, "Not Found") + "\r\n\r\n"
+	defer conn.Close()
+	// read the request
+	req, err := parseRequest(conn)
+	if err != nil {
+		fmt.Println("Error reading request: ", err.Error())
+		return
 	}
 
-  conn.Write([]byte(response))
-}
+	var response string
+	switch path := req.Path; {
+	case strings.HasPrefix(path, "/echo/"):
+		content := strings.TrimLeft(path, "/echo/")
+		response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(content), content)
+	case path == "/user-agent":
+		response = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(req.UserAgent), req.UserAgent)
+	case path == "/":
+		response = getStatus(200, "OK") + "\r\n\r\n"
+	case strings.HasPrefix(path, "/files/") && req.Method == "GET":
+		dir := os.Args[2]
+		fileName := strings.TrimPrefix(path, "/files/")
+		fmt.Println("dir: ", dir, " fileName: ", fileName)
+		data, error := os.ReadFile(dir + "/" + fileName)
 
+		if error != nil {
+			fmt.Println("Error reading file: ", error.Error(), " for file: ", fileName, " in directory: ", dir)
+			response = getStatus(404, "Not Found") + "\r\n\r\n"
+		} else {
+			response = fmt.Sprintf("%s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(data), data)
+		}
+	case strings.HasPrefix(path, "/files/") && req.Method == "POST":
+		dir := os.Args[2]
+		fileName := strings.TrimPrefix(path, "/files/")
+		contents := bytes.Trim([]byte(req.Body), "\x00")
+		err := os.WriteFile(dir+"/"+fileName, contents, 0644)
+		if err != nil {
+			fmt.Println("Error writing file: ", err.Error())
+			response = getStatus(500, "Internal Server Error") + "\r\n\r\n"
+		} else {
+			response = getStatus(201, "Created") + "\r\n\r\n"
+		}
+	default:
+		response = getStatus(404, "Not Found") + "\r\n\r\n"
+	}
+
+	conn.Write([]byte(response))
+}
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
-  l, err := net.Listen("tcp", ":4221")
-  if err != nil {
-    fmt.Println("Error listening: ", err.Error())
-    os.Exit(1)
-  }
+	l, err := net.Listen("tcp", ":4221")
 
-  defer l.Close()
+	if err != nil {
+		fmt.Println("Error listening: ", err.Error())
+		os.Exit(1)
+	}
 
-  for {
-    conn, err := l.Accept()
-    if err != nil {
-      fmt.Println("Error accepting: ", err.Error())
-      os.Exit(1)
-    }
+	defer l.Close()
 
-    go Handler(conn)
-  }
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting: ", err.Error())
+			os.Exit(1)
+		}
+
+		go Handler(conn)
+	}
 }
-
-
-
